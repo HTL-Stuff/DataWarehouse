@@ -1,3 +1,5 @@
+create schema if not exists oltp;
+
 SET schema 'oltp';
 
 drop table if exists "order";
