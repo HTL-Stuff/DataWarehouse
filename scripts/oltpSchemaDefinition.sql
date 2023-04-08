@@ -1,7 +1,7 @@
 create schema if not exists oltp;
+set schema 'oltp';
 
-SET schema 'oltp';
-
+drop table if exists order_details;
 drop table if exists "order";
 drop table if exists shipper;
 drop table if exists personnel;
@@ -96,3 +96,12 @@ create table if not exists "order"(
     shipped_date date not null,
     freight_cost int not null
 );
+
+create table if not exists order_details(
+    order_id int not null constraint fk_order_id references "order"(order_id),
+    product_id int not null constraint fk_product_id references product(product_id),
+    price_per_unit int not null,
+    count int not null,
+    discount int not null default 0,
+    primary key (order_id, product_id)
+)
