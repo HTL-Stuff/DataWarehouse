@@ -101,7 +101,7 @@ create table if not exists order_details (
     order_id       int not null references "order" (order_id),                         -- id der bestellung
     product_id     int not null references product (product_id),                       -- id des produkts
     price_per_unit int not null check ( price_per_unit > 0 ),                          -- preis pro einheit
-    count          int not null check ( count > 0 ),                                   -- anzahl der produkte
+    quantity       int not null check ( quantity > 0 ),                                -- anzahl der produkte
     discount       int not null default 0 check ( discount >= 0 and discount <= 100 ), -- rabatt in prozent
     primary key (order_id, product_id)                                                 -- der primary key besteht aus der kombination aus order_id und product_id
 );
