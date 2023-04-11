@@ -9,10 +9,13 @@ declare
     param_quarter integer;
     param_month   integer;
 begin
+    -- get the date parts from the string
     date_parts := string_to_array(date_string, '-');
     param_year := date_parts[1]::integer;
     param_quarter := (date_parts[2]::integer - 1) / 3 + 1;
     param_month := date_parts[2]::integer;
+
+    -- check if the date is already present in the table, if not insert it
     select id
     into date_key
     from dwh.dim_time
@@ -43,6 +46,7 @@ $$
 declare
     product_key integer;
 begin
+    -- check if the customer already exists in the dimension table, if not insert it
     select id
     into product_key
     from dwh.dim_product p
@@ -144,6 +148,7 @@ begin
 end;
 $$ language plpgsql;
 
+-- insert the freight cost to the fact table
 create or replace function dwh.insert_fact_freight_cost(
     param_date_key integer,
     param_order_id integer,
@@ -156,7 +161,7 @@ $$
 declare
     count integer;
 begin
-    select count(*)
+    select count(id)
     into count
     from dwh.fact_freight_cost f
     where f.order_id = param_order_id
@@ -183,6 +188,8 @@ declare
     personnel_key integer;
     shipper_key   integer;
 begin
+
+    -- fetch the data from the OLTP database
     open cursor for select od.order_id,
                            od.product_id,
                            od.price_per_unit,
@@ -232,7 +239,7 @@ begin
         shipper_key := (select dwh.get_shipper_key(temp_table.shipper_id, temp_table.shipper_name));
         date_key := (select dwh.get_date_key(temp_table.order_date::text));
 
-        -- insert the fact table
+        -- insert the fact table, could also be done with a dedicated function
         insert into dwh.fact_turnover(product_id, customer_id, personnel_id, shipper_id, time_id, turnover)
         VALUES (product_key, customer_key, personnel_key, shipper_key, date_key, temp_table.price_per_unit *
                                                                                  temp_table.quantity *
@@ -240,6 +247,7 @@ begin
         on conflict do nothing;
         -- update date key to shipped date
         date_key := (select dwh.get_date_key(temp_table.shipped_date::text));
+        -- insert the freight cost to the fact table, i chose to use a function for this because we need to check if the freight cost already exists. Since multiple order_ids can be present, if more products are ordered.
         perform dwh.insert_fact_freight_cost(date_key, temp_table.order_id, customer_key, personnel_key, shipper_key,
                                              temp_table.freight_cost);
     end loop;
