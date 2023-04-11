@@ -1,3 +1,4 @@
+set schema 'dwh';
 -- The following function is used to create a date key from a date string. The function will return the primary key for the date in the table. If the date key does not exist in the dimension table, it will be created.
 create or replace function dwh.get_date_key(date_string text) returns integer as
 $$
@@ -163,7 +164,6 @@ begin
       and f.personnel_id = param_personnel_key
       and f.shipper_id = param_shipper_key
       and f.freight_cost = param_freight_cost;
-    raise notice 'count: %', count;
     if count = 0 then
         insert into dwh.fact_freight_cost (order_id, customer_id, personnel_id, shipper_id, time_id, freight_cost)
         values (param_order_id, param_customer_key, param_personnel_key, param_shipper_key, param_date_key, param_freight_cost);
@@ -213,13 +213,12 @@ begin
                              join oltp.category c on c.category_id = p.category_id
                              join oltp.supplier s on s.supplier_id = p.supplier_id
                              join oltp.customer cs on o.customer_id = cs.customer_id
-                             join personnel pe on pe.personnel_id = o.personnel_id
-                             join shipper si on o.shipper_id = si.shipper_id;
+                             join oltp.personnel pe on pe.personnel_id = o.personnel_id
+                             join oltp.shipper si on o.shipper_id = si.shipper_id;
 
     loop
         fetch cursor into temp_table;
         exit when not found;
-
         -- get the surrogate keys for the dimension tables, if they do not exist, they will be created
         product_key := (select dwh.get_product_key(temp_table.product_id, temp_table.product, temp_table.order_id,
                                                    temp_table.city, temp_table.quantity, temp_table.country,
@@ -241,9 +240,19 @@ begin
         on conflict do nothing;
         -- update date key to shipped date
         date_key := (select dwh.get_date_key(temp_table.shipped_date::text));
-        --insert into dwh.fact_freight_cost(customer_id, order_id, personnel_id, shipper_id, time_id, freight_cost) VALUES (customer_key, temp_table.order_id, personnel_key, shipper_key, date_key, temp_table.freight_cost) on conflict do nothing;
         perform dwh.insert_fact_freight_cost(date_key, temp_table.order_id, customer_key, personnel_key, shipper_key,
                                              temp_table.freight_cost);
     end loop;
 end;
 $$ language plpgsql;
+
+truncate table dim_product cascade;
+truncate table dim_customer cascade;
+truncate table dim_personnel cascade;
+truncate table dim_shipper cascade;
+truncate table dim_time cascade;
+truncate table fact_freight_cost cascade;
+truncate table fact_turnover cascade;
+select load_dwh();
+
+drop function load_dwh();
